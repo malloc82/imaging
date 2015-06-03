@@ -1,14 +1,13 @@
 (ns imaging.core
   ;; (:use clojure.core.matrix clojure.core.matrix.operators)
   (:use [clojure.core.matrix :as mat])
-  (:require [clojure.core.matrix :refer :all]
-            [clojure.core.matrix.operators :as mo])
+  ;; (:require [clojure.core.matrix :refer :all]
+  ;;           [clojure.core.matrix.operators :as mo])
   (:import (java.io File FileInputStream)
            javax.imageio.ImageIO
            (java.awt.image BufferedImage Raster WritableRaster)
            (javax.swing JFrame JLabel)
-           (java.awt Graphics Dimension Color)
-           ij.IJ))
+           (java.awt Graphics Dimension Color)))
 
 (defn imread [filename]
   (let [image  (ImageIO/read (File. filename))
