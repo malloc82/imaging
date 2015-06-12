@@ -87,33 +87,39 @@
 (defn load-txt-image_array [src_fname & {:keys [show debug]
                                          :or   {show  false
                                                 debug false}}]
-  (let [[row col] (with-open [rdr (io/reader src_fname)]
+  (let [[^long row ^long col] (with-open [rdr (io/reader src_fname)]
                     (let [stream (line-seq rdr)]
                       [(count stream)
                        (count (str/split (first (take 1 stream)) #"\s"))]))
         data      (timer "loading txt data"
-                         (double-array
-                          (mapv #(Double. ^String %) (str/split (slurp src_fname) #"[\s]+"))))
+                         ^doubles (double-array
+                                   (mapv #(Double. ^String %) (str/split (slurp src_fname) #"[\s]+"))))
         image     (BufferedImage. col row BufferedImage/TYPE_USHORT_GRAY)]
     (when debug
       (println "row =" row "  col =" col " count =" (count data) (class data)))
     (let [;; max_val (timer "max" (apply max (vec data))
           ;; min_val (timer "min" (apply min (vec data))
           [^double min_val ^double max_val] (timer "min max : "
-                                                   (areduce ^doubles data i
-                                                            min-max [0.0 0.0]
-                                                            (let [val  (aget ^doubles data i)
-                                                                  minv ^double (min-max 0)
-                                                                  maxv ^double (min-max 1)]
-                                                              [(if (< val minv) val minv)
-                                                               (if (> val maxv) val maxv)])))]
+                                                   (let [len (alength data)]
+                                                     (loop [_min (double 0.0)
+                                                            _max (double 0.0)
+                                                            i    (long 0)]
+                                                       (if (< i len)
+                                                         (let [val (aget data i)]
+                                                           (recur (Math/min _min val) (Math/max _max val) (unchecked-inc i)))
+                                                         [_min _max]))))]
       (when debug
         (println "min =" min_val " max =" max_val))
       (timer "update pixel values"
-             (let [scaled_range ^double (- max_val min_val)]
-               (doseq [i (range (* row col))]
-                 (aset ^doubles data ^long i (* (/ (- (aget ^doubles data i) min_val) scaled_range) 0xffff)))
-               (.setPixels ^WritableRaster (.getRaster image) 0 0 ^long col ^long row ^doubles data))))
+             (let [scaled_range ^double (- max_val min_val)
+                   last-idx     ^long   (dec (* row col))]
+               (loop [i 0]
+                 (aset data i (* (/ (- (aget ^doubles data i) min_val) scaled_range) 0xffff))
+                 (when (< i last-idx)
+                   (recur (inc i))))
+               ;; (doseq [i (range (* row col))]
+               ;;   (aset data ^long i ^double (* (/ (- (aget data i) min_val) scaled_range) 0xffff)))
+               (.setPixels ^WritableRaster (.getRaster image) 0 0 col row data))))
     (when show
       (timer "displaying"
              (let [canvas (JLabel. (ImageIcon. image))]
@@ -166,4 +172,9 @@
 
 ;; (DataInputStream. (FileInputStream. "resources/PCT/x_0.txt"))
 
-
+(defn array-max [^doubles arr]
+  (let [len (alength arr)]
+    (loop [m Double/NEGATIVE_INFINITY indx 0]
+      (if (< indx len)
+        (recur (max m (aget arr indx)) (unchecked-inc indx))
+        m))))
