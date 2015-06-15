@@ -112,13 +112,12 @@
         (println "min =" min_val " max =" max_val))
       (timer "update pixel values"
              (let [scaled_range ^double (- max_val min_val)
-                   last-idx     ^long   (dec (* row col))]
-               (loop [i 0]
-                 (aset data i (* (/ (- (aget ^doubles data i) min_val) scaled_range) 0xffff))
-                 (when (< i last-idx)
-                   (recur (inc i))))
-               ;; (doseq [i (range (* row col))]
-               ;;   (aset data ^long i ^double (* (/ (- (aget data i) min_val) scaled_range) 0xffff)))
+                   length       ^long   (* row col)]
+               (loop [i (long 0)]
+                 (when (< i length)
+                   (let [v (aget data i)]
+                     (aset data i (* (/ (- v min_val) scaled_range) 0xffff))
+                     (recur (unchecked-inc i)))))
                (.setPixels ^WritableRaster (.getRaster image) 0 0 col row data))))
     (when show
       (timer "displaying"
@@ -172,9 +171,3 @@
 
 ;; (DataInputStream. (FileInputStream. "resources/PCT/x_0.txt"))
 
-(defn array-max [^doubles arr]
-  (let [len (alength arr)]
-    (loop [m Double/NEGATIVE_INFINITY indx 0]
-      (if (< indx len)
-        (recur (max m (aget arr indx)) (unchecked-inc indx))
-        m))))
