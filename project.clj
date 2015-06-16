@@ -6,4 +6,5 @@
   :dependencies [[org.clojure/clojure "1.7.0-RC1"]
                  [net.mikera/core.matrix "0.34.0"]
                  [net.mikera/vectorz-clj "0.29.0"]]
+  :jvm-opts ^:replace []
   :resource-paths ["resources/ij.jar"])

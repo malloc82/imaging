@@ -76,10 +76,11 @@
                  ;;                     (.setHorizontalScrollBarPolicy JScrollPane/HORIZONTAL_SCROLLBAR_AS_NEEDED)
                  ;;                     (.setVerticalScrollBarPolicy JScrollPane/VERTICAL_SCROLLBAR_AS_NEEDED))
                  ;;                   BorderLayout/CENTER))))
-                 (-> .getContentPane (.add (doto (JScrollPane.)
-                                             (-> .getViewport (.add canvas))
-                                             (.setHorizontalScrollBarPolicy JScrollPane/HORIZONTAL_SCROLLBAR_AS_NEEDED)
-                                             (.setVerticalScrollBarPolicy JScrollPane/VERTICAL_SCROLLBAR_AS_NEEDED))))
+                 (-> .getContentPane
+                     (.add (doto (JScrollPane.)
+                             (-> .getViewport (.add canvas))
+                             (.setHorizontalScrollBarPolicy JScrollPane/HORIZONTAL_SCROLLBAR_AS_NEEDED)
+                             (.setVerticalScrollBarPolicy JScrollPane/VERTICAL_SCROLLBAR_AS_NEEDED))))
                  (.setVisible true)
                  (.show)))))
     data))
@@ -97,16 +98,16 @@
         image     (BufferedImage. col row BufferedImage/TYPE_USHORT_GRAY)]
     (when debug
       (println "row =" row "  col =" col " count =" (count data) (class data)))
-    (let [;; max_val (timer "max" (apply max (vec data))
-          ;; min_val (timer "min" (apply min (vec data))
-          [^double min_val ^double max_val] (timer "min max : "
+    (let [[^double min_val ^double max_val] (timer "min max : "
                                                    (let [len (alength data)]
                                                      (loop [_min (double 0.0)
                                                             _max (double 0.0)
                                                             i    (long 0)]
                                                        (if (< i len)
                                                          (let [val (aget data i)]
-                                                           (recur (Math/min _min val) (Math/max _max val) (unchecked-inc i)))
+                                                           (recur (Math/min _min val)
+                                                                  (Math/max _max val)
+                                                                  (unchecked-inc i)))
                                                          [_min _max]))))]
       (when debug
         (println "min =" min_val " max =" max_val))
@@ -124,10 +125,11 @@
              (let [canvas (JLabel. (ImageIcon. image))]
                (doto (JFrame.)
                  (.setSize (Dimension. (+ col 40) (* col 5)))
-                 (-> .getContentPane (.add (doto (JScrollPane.)
-                                             (-> .getViewport (.add canvas))
-                                             (.setHorizontalScrollBarPolicy JScrollPane/HORIZONTAL_SCROLLBAR_AS_NEEDED)
-                                             (.setVerticalScrollBarPolicy JScrollPane/VERTICAL_SCROLLBAR_AS_NEEDED))))
+                 (-> .getContentPane
+                     (.add (doto (JScrollPane.)
+                             (-> .getViewport (.add canvas))
+                             (.setHorizontalScrollBarPolicy JScrollPane/HORIZONTAL_SCROLLBAR_AS_NEEDED)
+                             (.setVerticalScrollBarPolicy JScrollPane/VERTICAL_SCROLLBAR_AS_NEEDED))))
                  (.setVisible true)
                  (.show)))))
     data))
@@ -140,7 +142,8 @@
                       [(count stream)
                        (count (str/split (first (take 1 stream)) #"\s"))]))
         data      (timer "loading txt data"
-                         (mat/array :vectorz (mapv #(Double. ^String %) (str/split (slurp src_fname) #"[\s]+"))))
+                         (mat/array :vectorz (mapv #(Double. ^String %)
+                                                   (str/split (slurp src_fname) #"[\s]+"))))
         image     (BufferedImage. ^long col ^long row BufferedImage/TYPE_USHORT_GRAY)]
     (when debug
       (println "row =" row "  col =" col " count =" (count data) (class data)))
@@ -157,10 +160,11 @@
              (let [canvas (JLabel. (ImageIcon. image))]
                (doto (JFrame.)
                  (.setSize (Dimension. (+ col 40) (* col 5)))
-                 (-> .getContentPane (.add (doto (JScrollPane.)
-                                             (-> .getViewport (.add canvas))
-                                             (.setHorizontalScrollBarPolicy JScrollPane/HORIZONTAL_SCROLLBAR_AS_NEEDED)
-                                             (.setVerticalScrollBarPolicy JScrollPane/VERTICAL_SCROLLBAR_AS_NEEDED))))
+                 (-> .getContentPane
+                     (.add (doto (JScrollPane.)
+                             (-> .getViewport (.add canvas))
+                             (.setHorizontalScrollBarPolicy JScrollPane/HORIZONTAL_SCROLLBAR_AS_NEEDED)
+                             (.setVerticalScrollBarPolicy JScrollPane/VERTICAL_SCROLLBAR_AS_NEEDED))))
                  (.setVisible true)
                  (.show)))))
     data))
