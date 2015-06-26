@@ -126,15 +126,32 @@
 
 (defn dcm4che_read [filename]
   (let [stream (DicomInputStream. (File. filename))
-        attr   (.readDataset stream -1 -1)]
-    (pprint (str/split (.toString attr 300 80) #"[\n]"))))
+        attributes (.readDataset stream -1 -1)]
+    (pprint (str/split (.toString attributes 300 80) #"[\n]"))))
 
-(defn dcm4che_write [filename]
-  (let [attr (Attributes.)]
-    (.setDouble attr Tag/PixelSpacing VR/DS (double-array [1 1]))
-    (.setInt    attr Tag/Rows VR/US (int-array [6400]))
-    (.setInt    attr Tag/Columns VR/US (int-array [200]))
-    (.setInt    attr Tag/HighBit VR/US (int-array [15]))))
+(defn dcm4che_write [mat_data]
+  (let [[row col]  (shape mat_data)
+        attributes (doto (Attributes.)
+                     (.setString Tag/StudyInstanceUID  VR/UI (UIDUtils/createUID))
+                     (.setString Tag/SeriesInstanceUID VR/UI (UIDUtils/createUID))
+                     (.setString Tag/SOPInstanceUID    VR/UI (UIDUtils/createUID))
+                     (.setString Tag/SOPClassUID       VR/UI (UIDUtils/createUID))
+
+                     (.setDouble Tag/PixelSpacing  VR/DS (double-array [1.0 1.0]))
+                     (.setInt    Tag/Rows          VR/US (int-array    [row]))
+                     (.setInt    Tag/Columns       VR/US (int-array    [col]))
+                     (.setInt    Tag/BitsAllocated VR/US (int-array    [16]))
+                     (.setInt    Tag/BitsStored    VR/US (int-array    [16]))
+                     (.setInt    Tag/HighBit       VR/US (int-array    [15]))
+                     (.setInt    Tag/PixelRepresentation VR/US (int-array [1]))
+                     (.setInt    Tag/SamplesPerPixel     VR/US (int-array [1]))
+                     (.setInt    Tag/PixelData     VR/OW (into-array Integer/TYPE (to-double-array mat_data))))
+        ostream    (DicomOutputStream. (doto (File. "resources/dcm_out.dcm")
+                                        (.createNewFile)))]
+    (.writeDataset ostream  (.createFileMetaInformation attributes UID/CTImageStorage) attributes)
+    (.writeHeader  ostream  Tag/SequenceDelimitationItem nil 0)
+    (.close ostream)
+    attributes))
 
 ;; (doto (ij.io.FileInfo.)
 ;;   (-> .fileName (set! "x_0.txt"))
