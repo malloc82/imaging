@@ -12,16 +12,21 @@
 
            [org.dcm4che3.io DicomInputStream DicomOutputStream]
            [org.dcm4che3.io.DicomInputStream.IncludeBulkData]
-           [org.dcm4che3.data Attributes Tag UID VR]
+           [org.dcm4che3.data Attributes Tag DatePrecision UID VR]
            [org.dcm4che3.util UIDUtils]
 
            [java.io File InputStream FileInputStream FileOutputStream DataInputStream]
            java.io.InputStream
+           [java.util Date TimeZone]
+           [java.time ZoneId]
+           [java.text SimpleDateFormat]
            (java.awt.image BufferedImage Raster WritableRaster)
            (javax.swing JFrame JLabel JPanel)
            (java.awt Graphics Dimension Color)
            [javax.swing JScrollPane ImageIcon]
            java.awt.BorderLayout))
+
+(def ^:dynamic *timezone* (TimeZone/getTimeZone "America/Chicago"))
 
 (mat/set-current-implementation :vectorz)
 
@@ -124,33 +129,76 @@
                    (.show)))))
       (mat/to-double-array data))))
 
-(defn dcm4che_read [filename]
+(defn dcm4che_read [filename & {:keys [print]
+                                :or [print false]}]
   (let [stream (DicomInputStream. (File. filename))
         attributes (.readDataset stream -1 -1)]
-    (pprint (str/split (.toString attributes 300 80) #"[\n]"))))
+    (when print
+      (pprint (str/split (.toString attributes 300 80) #"[\n]")))
+    attributes))
 
-(defn dcm4che_write [mat_data]
+(defn print_attribute [^Attributes attr]
+  (pprint (str/split (.toString attr 300 80) #"[\n]")))
+
+(defn dcm4che_write [mat_data filename]
   (let [[row col]  (shape mat_data)
+        curr_date  (into-array Date [(Date.)])
+        birthday   (into-array Date [(.parse (SimpleDateFormat. "yyyy-MM-dd'T'HH:mm:ss Z") "1982-12-14T12:00:00 +0800")])
         attributes (doto (Attributes.)
-                     (.setString Tag/StudyInstanceUID  VR/UI (UIDUtils/createUID))
-                     (.setString Tag/SeriesInstanceUID VR/UI (UIDUtils/createUID))
-                     (.setString Tag/SOPInstanceUID    VR/UI (UIDUtils/createUID))
-                     (.setString Tag/SOPClassUID       VR/UI (UIDUtils/createUID))
+                     (.setTimezone *timezone*)
+                     (.setString Tag/SpecificCharacterSet VR/CS "ISO_IR 100")
+                     (.setString Tag/ImageType            VR/CS "Original\\PRIMARY\\AXIAL")
+                     (.setDate   Tag/InstanceCreationDate VR/DA curr_date)
+                     (.setDate   Tag/InstanceCreationTime VR/TM curr_date)
 
-                     (.setDouble Tag/PixelSpacing  VR/DS (double-array [1.0 1.0]))
-                     (.setInt    Tag/Rows          VR/US (int-array    [row]))
-                     (.setInt    Tag/Columns       VR/US (int-array    [col]))
-                     (.setInt    Tag/BitsAllocated VR/US (int-array    [16]))
-                     (.setInt    Tag/BitsStored    VR/US (int-array    [16]))
-                     (.setInt    Tag/HighBit       VR/US (int-array    [15]))
+                     (.setDate   Tag/StudyDate            VR/DA curr_date)
+                     (.setDate   Tag/SeriesDate           VR/DA curr_date)
+                     (.setDate   Tag/AcquisitionDate      VR/DA curr_date)
+                     (.setDate   Tag/ContentDate          VR/DA curr_date)
+
+                     (.setDate   Tag/StudyTime            VR/TM curr_date)
+                     (.setDate   Tag/SeriesTime           VR/TM curr_date)
+                     (.setDate   Tag/AcquisitionTime      VR/TM curr_date)
+                     (.setDate   Tag/ContentTime          VR/TM curr_date)
+
+                     (.setString Tag/Manufacturer           VR/LO "Baylor Scientific Computation Laboratory")
+                     (.setString Tag/InstitutionName        VR/LO "Baylor University")
+
+                     (.setString Tag/ReferringPhysicianName VR/PN "Jesus Christ")
+                     (.setString Tag/StationName            VR/SH "tardis-student1")
+
+                     (.setString Tag/StudyDescription             VR/LO "DICOM construction test")
+                     (.setString Tag/SeriesDescription            VR/LO "DICOM construction test")
+                     (.setString Tag/NameOfPhysiciansReadingStudy VR/PN "")
+                     (.setString Tag/OperatorsName                VR/PN "")
+                     (.setString Tag/ManufacturerModelName        VR/LO "Clojure + dcm4che 3.3.7")
+
+                     (.setString Tag/PatientName              VR/PN "PCT")
+                     (.setString Tag/PatientID                VR/LO "0000000000000")
+                     (.setDate   Tag/PatientBirthDate         VR/DA birthday)
+                     (.setString Tag/PatientSex               VR/CS "Male")
+                     (.setString Tag/PatientAge               VR/AS "100")
+                     (.setString Tag/AdditionalPatientHistory VR/LT "N/A")
+
+                     (.setString Tag/StudyInstanceUID    VR/UI (UIDUtils/createUID))
+                     (.setString Tag/SeriesInstanceUID   VR/UI (UIDUtils/createUID))
+                     (.setString Tag/SOPInstanceUID      VR/UI (UIDUtils/createUID))
+                     (.setString Tag/SOPClassUID         VR/UI (UIDUtils/createUID))
+
+                     (.setDouble Tag/PixelSpacing        VR/DS (double-array [1.0 1.0]))
+                     (.setInt    Tag/Rows                VR/US (int-array    [row]))
+                     (.setInt    Tag/Columns             VR/US (int-array    [col]))
+                     (.setInt    Tag/BitsAllocated       VR/US (int-array    [16]))
+                     (.setInt    Tag/BitsStored          VR/US (int-array    [16]))
+                     (.setInt    Tag/HighBit             VR/US (int-array    [15]))
                      (.setInt    Tag/PixelRepresentation VR/US (int-array [1]))
                      (.setInt    Tag/SamplesPerPixel     VR/US (int-array [1]))
-                     (.setInt    Tag/PixelData     VR/OW (into-array Integer/TYPE (to-double-array mat_data))))
-        ostream    (DicomOutputStream. (doto (File. "resources/dcm_out.dcm")
-                                        (.createNewFile)))]
-    (.writeDataset ostream  (.createFileMetaInformation attributes UID/CTImageStorage) attributes)
-    (.writeHeader  ostream  Tag/SequenceDelimitationItem nil 0)
-    (.close ostream)
+                     (.setInt    Tag/PixelData           VR/OW (into-array Integer/TYPE (to-double-array mat_data))))]
+    (doto (DicomOutputStream. (doto (File. filename)
+                                (.createNewFile)))
+      (.writeDataset (.createFileMetaInformation attributes UID/CTImageStorage) attributes)
+      (.writeHeader  Tag/SequenceDelimitationItem nil 0)
+      (.close))
     attributes))
 
 ;; (doto (ij.io.FileInfo.)
