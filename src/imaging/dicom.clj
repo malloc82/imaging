@@ -10,14 +10,16 @@
            ij.plugin.DICOM
            ij.io.ImageWriter
 
-           [org.dcm4che3.io DicomInputStream DicomOutputStream]
+           [org.dcm4che3.io DicomInputStream DicomOutputStream DicomEncodingOptions]
            [org.dcm4che3.io.DicomInputStream.IncludeBulkData]
            [org.dcm4che3.data Attributes Tag DatePrecision UID VR]
            [org.dcm4che3.util UIDUtils]
+           ;; [org.dcm4che3.imageio.codec Compressor Decompressor TransferSyntaxType]
+           ;; [org.dcm4che3.image PhotometricInterpretation]
 
            [java.io File InputStream FileInputStream FileOutputStream DataInputStream]
            java.io.InputStream
-           [java.util Date TimeZone]
+           [java.util Date TimeZone Scanner]
            [java.time ZoneId]
            [java.text SimpleDateFormat]
            (java.awt.image BufferedImage Raster WritableRaster)
@@ -26,15 +28,24 @@
            [javax.swing JScrollPane ImageIcon]
            java.awt.BorderLayout))
 
+
+(set! *warn-on-reflection* true)
+;; (set! *unchecked-math* true)
+
 (def ^:dynamic *timezone* (TimeZone/getTimeZone "America/Chicago"))
+(def ^:dynamic *debug*    true)
 
 (mat/set-current-implementation :vectorz)
 
-(defmacro timer [msg call]
-  `(let [startTime# (System/nanoTime)]
-     (let [retval#    ~call]
-       (println "  ==> timing:  " ~msg " " (/ (- (System/nanoTime) startTime#) 1000000.0) "ms")
-       retval#)))
+(defmacro timer [msg call & {:keys [on]
+                             :or   {on false}}]
+  (if-not on
+    `(let [startTime# (System/nanoTime)
+           retval#  ~call
+           endTime#   (System/nanoTime)]
+       (println "  ==> timing:  " ~msg " " (/ (- endTime# startTime#) 1000000.0) "ms")
+       retval#)
+    call))
 
 (def test_samples "resources/PCT/CTP404_merged")
 
@@ -78,20 +89,30 @@
         (.setVisible true)
         (.show)))))
 
-(defn load-txt-data [src_fname & {:keys [show debug]
-                                   :or   {show  false
-                                          debug false}}]
-  (let [[row col] (with-open [rdr (io/reader src_fname)]
-                    (let [stream (line-seq rdr)]
-                      [(count stream)
-                       (count (str/split (first (take 1 stream)) #"\s"))]))
-        data      (timer "loading txt data"
-                         (Matrix/wrap row col
-                                      (double-array (mapv #(Double. ^String %)
-                                                          (str/split (slurp src_fname) #"[\s]+")))))]
+(defn load-txt-data ^Matrix [^String src_fname & {:keys [show debug]
+                                                  :or   {show  false
+                                                         debug false}}]
+  (let [[^long col ^long row] (with-open [rdr (io/reader src_fname)]
+                                (let [stream (line-seq rdr)]
+                                  [^long (count (str/split (first stream) #"[\s]+"))
+                                   ^long (count stream)]))
+        data_mat  ^Matrix (let [data_str  (str/split (slurp src_fname) #"[\s]+")
+                                array_len ^long (* row col)
+                                data      ^doubles (double-array array_len)]
+                            (loop [i ^long (long 0)]
+                              (when (< i array_len)
+                                (aset data i ^double (Double. ^String (data_str i)))
+                                (recur (unchecked-inc i))))
+                            (Matrix/wrap ^long row ^long col ^doubles data))]
     (when show
-      (timer "displaying" (imshow data)))
-    data))
+      (timer "displaying" (imshow data_mat)))
+    data_mat))
+
+;; (loop [i ^long (long 0)]
+;;   (when (< i 10)
+;;     (let [data (time (load-txt-data "resources/PCT/CTP404_merged/x_11.txt"))]
+;;       (recur (unchecked-inc i)))))
+
 
 (defn load-txt-image [src_fname & {:keys [show debug]
                                    :or   {show  false
@@ -129,23 +150,36 @@
                    (.show)))))
       (mat/to-double-array data))))
 
-(defn dcm4che_read [filename & {:keys [print]
-                                :or [print false]}]
+(defn dcm4che_read [^String filename & {:keys [print]
+                                        :or [print false]}]
   (let [stream (DicomInputStream. (File. filename))
         attributes (.readDataset stream -1 -1)]
     (when print
-      (pprint (str/split (.toString attributes 300 80) #"[\n]")))
+      (pprint (str/split (.toString attributes 300 100) #"[\n]")))
     attributes))
 
 (defn print_attribute [^Attributes attr]
-  (pprint (str/split (.toString attr 300 80) #"[\n]")))
+  (pprint (str/split (.toString attr 300 100) #"[\n]")))
 
-(defn dcm4che_write [mat_data filename]
+(defn write_attribute ^Attributes [^Attributes attr ^String filename]
+  (let [fmi (.createFileMetaInformation attr UID/ExplicitVRLittleEndian)]
+    (doto (DicomOutputStream. (doto (File. filename)
+                                (.createNewFile)))
+      (.setEncodingOptions DicomEncodingOptions/DEFAULT)
+      (.writeDataset fmi attr)
+      (.close))
+    fmi))
+
+(defn dcm4che_write [mat_data ^String filename]
   (let [[row col]  (shape mat_data)
-        curr_date  (into-array Date [(Date.)])
-        birthday   (into-array Date [(.parse (SimpleDateFormat. "yyyy-MM-dd'T'HH:mm:ss Z") "1982-12-14T12:00:00 +0800")])
+        curr_date  #^"[Ljava.util.Date;" (into-array Date [(Date.)])
+        birthday   #^"[Ljava.util.Date;" (into-array Date [(.parse (SimpleDateFormat. "yyyy-MM-dd'T'HH:mm:ss Z") "1982-12-14T12:00:00 +0800")])
+
         attributes (doto (Attributes.)
                      (.setTimezone *timezone*)
+                     (.setString Tag/SOPInstanceUID      VR/UI (UIDUtils/createUID))
+                     (.setString Tag/SOPClassUID         VR/UI (UIDUtils/createUID))
+                     ;; 0008
                      (.setString Tag/SpecificCharacterSet VR/CS "ISO_IR 100")
                      (.setString Tag/ImageType            VR/CS "Original\\PRIMARY\\AXIAL")
                      (.setDate   Tag/InstanceCreationDate VR/DA curr_date)
@@ -172,27 +206,64 @@
                      (.setString Tag/NameOfPhysiciansReadingStudy VR/PN "")
                      (.setString Tag/OperatorsName                VR/PN "")
                      (.setString Tag/ManufacturerModelName        VR/LO "Clojure + dcm4che 3.3.7")
-
+                     ;; 0010
                      (.setString Tag/PatientName              VR/PN "PCT")
                      (.setString Tag/PatientID                VR/LO "0000000000000")
                      (.setDate   Tag/PatientBirthDate         VR/DA birthday)
                      (.setString Tag/PatientSex               VR/CS "Male")
                      (.setString Tag/PatientAge               VR/AS "100")
                      (.setString Tag/AdditionalPatientHistory VR/LT "N/A")
-
-                     (.setString Tag/StudyInstanceUID    VR/UI (UIDUtils/createUID))
-                     (.setString Tag/SeriesInstanceUID   VR/UI (UIDUtils/createUID))
-                     (.setString Tag/SOPInstanceUID      VR/UI (UIDUtils/createUID))
-                     (.setString Tag/SOPClassUID         VR/UI (UIDUtils/createUID))
-
+                     ;; 0018
+                     (.setString Tag/ScanOptions              VR/CS "whatever")
+                     (.setDouble Tag/SliceThickness           VR/DS (double-array [1.0]))
+                     (.setDouble Tag/KVP                      VR/DS (double-array [120.0]))
+                     (.setDouble Tag/DataCollectionDiameter   VR/DS (double-array [500.0]))
+                     (.setString Tag/SoftwareVersions         VR/LO "v0.001")
+                     (.setString Tag/ProtocolName             VR/LO "DICOM test")
+                     (.setDouble Tag/ReconstructionDiameter   VR/DS (double-array [100.0]))
+                     (.setDouble Tag/DistanceSourceToDetector VR/DS (double-array [100.0]))
+                     (.setDouble Tag/DistanceSourceToPatient  VR/DS (double-array [100.0]))
+                     (.setDouble Tag/GantryDetectorTilt       VR/DS (double-array [0.0]))
+                     (.setDouble Tag/TableHeight              VR/DS (double-array [100.0]))
+                     (.setString Tag/RotationDirection        VR/CS "CW")
+                     (.setString Tag/ExposureTime             VR/IS "1000")
+                     (.setString Tag/XRayTubeCurrent          VR/IS "200")
+                     (.setString Tag/Exposure                 VR/IS "3")
+                     (.setString Tag/FilterType               VR/SH "Some Filter")
+                     (.setString Tag/GeneratorPower           VR/IS "24000")
+                     (.setDouble Tag/FocalSpots               VR/DS (double-array [0.7]))
+                     (.setString Tag/ConvolutionKernel        VR/SH "STANDARD")
+                     (.setString Tag/PatientPosition          VR/CS "HFS")
+                     (.setDouble Tag/RevolutionTime           VR/FD (double-array [1.0]))
+                     (.setDouble Tag/SingleCollimationWidth   VR/FD (double-array [0.625]))
+                     (.setDouble Tag/TotalCollimationWidth    VR/FD (double-array [40.0]))
+                     (.setDouble Tag/TableSpeed               VR/FD (double-array [39.375]))
+                     (.setDouble Tag/TableFeedPerRotation     VR/FD (double-array [39.375]))
+                     (.setDouble Tag/SpiralPitchFactor        VR/FD (double-array [0.984375]))
+                     ;; 0020
+                     (.setString Tag/StudyInstanceUID           VR/UI (UIDUtils/createUID))
+                     (.setString Tag/SeriesInstanceUID          VR/UI (UIDUtils/createUID))
+                     (.setString Tag/StudyID                    VR/SH "00000")
+                     (.setString Tag/SeriesNumber               VR/IS "11111")
+                     (.setString Tag/AcquisitionNumber          VR/IS "0")
+                     (.setString Tag/InstanceNumber             VR/IS "0")
+                     (.setDouble Tag/ImagePositionPatient       VR/DS  (double-array [0.0 0.0 0.0]))
+                     (.setDouble Tag/ImageOrientationPatient    VR/DS  (double-array [0.0 1.0
+                                                                                      0.0 0.0
+                                                                                      0.0 -1.0]))
+                     (.setString Tag/FrameOfReferenceUID        VR/UI (UIDUtils/createUID))
+                     (.setString Tag/PositionReferenceIndicator VR/LO "IC")
+                     (.setDouble Tag/SliceLocation              VR/DS (double-array [0.0]))
+                     ;; 0028
                      (.setDouble Tag/PixelSpacing        VR/DS (double-array [1.0 1.0]))
                      (.setInt    Tag/Rows                VR/US (int-array    [row]))
                      (.setInt    Tag/Columns             VR/US (int-array    [col]))
                      (.setInt    Tag/BitsAllocated       VR/US (int-array    [16]))
                      (.setInt    Tag/BitsStored          VR/US (int-array    [16]))
                      (.setInt    Tag/HighBit             VR/US (int-array    [15]))
-                     (.setInt    Tag/PixelRepresentation VR/US (int-array [1]))
-                     (.setInt    Tag/SamplesPerPixel     VR/US (int-array [1]))
+                     (.setInt    Tag/PixelRepresentation VR/US (int-array    [1]))
+                     (.setInt    Tag/SamplesPerPixel     VR/US (int-array    [1]))
+                     ;; 7FE0
                      (.setInt    Tag/PixelData           VR/OW (into-array Integer/TYPE (to-double-array mat_data))))]
     (doto (DicomOutputStream. (doto (File. filename)
                                 (.createNewFile)))
