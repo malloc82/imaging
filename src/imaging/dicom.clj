@@ -158,10 +158,15 @@
       (pprint (str/split (.toString attributes 300 100) #"[\n]")))
     attributes))
 
-(defn print_attribute [^Attributes attr]
+(defn print_attribute
+  "Pretty print an attribute in REPL."
+  [^Attributes attr]
   (pprint (str/split (.toString attr 300 100) #"[\n]")))
 
-(defn write_attribute ^Attributes [^Attributes attr ^String filename]
+(defn write_attribute
+  "Write existing DICOM attribute to file to create DICOM file.
+   Returning newly created File Meta Information."
+  ^Attributes [^Attributes attr ^String path]
   (let [fmi (.createFileMetaInformation attr UID/ExplicitVRLittleEndian)]
     (doto (DicomOutputStream. (doto (File. filename)
                                 (.createNewFile)))
@@ -170,11 +175,15 @@
       (.close))
     fmi))
 
+(defn mk_attribute
+  "Creating a new dcm4che attribute object from hash map."
+  ^Attributes [attr_map]
+  )
+
 (defn dcm4che_write [mat_data ^String filename]
   (let [[row col]  (shape mat_data)
         curr_date  #^"[Ljava.util.Date;" (into-array Date [(Date.)])
         birthday   #^"[Ljava.util.Date;" (into-array Date [(.parse (SimpleDateFormat. "yyyy-MM-dd'T'HH:mm:ss Z") "1982-12-14T12:00:00 +0800")])
-
         attributes (doto (Attributes.)
                      (.setTimezone *timezone*)
                      (.setString Tag/SOPInstanceUID      VR/UI (UIDUtils/createUID))
@@ -267,7 +276,7 @@
                      (.setInt    Tag/PixelData           VR/OW (into-array Integer/TYPE (to-double-array mat_data))))]
     (doto (DicomOutputStream. (doto (File. filename)
                                 (.createNewFile)))
-      (.writeDataset (.createFileMetaInformation attributes UID/CTImageStorage) attributes)
+      (.writeDataset (.createFileMetaInformation attributes UID/ExplicitVRLittleEndian) attributes)
       (.writeHeader  Tag/SequenceDelimitationItem nil 0)
       (.close))
     attributes))
@@ -278,3 +287,88 @@
 
 ;; (DataInputStream. (FileInputStream. "resources/PCT/x_0.txt"))
 
+{;; 0008
+ :SpecificCharacterSet         (fn [^Attributes attr ^String ch-set]             (.setString attr Tag/SpecificCharacterSet         VR/CS ch-set))
+ :ImageType                    (fn [^Attributes attr ^String im-type]            (.setString attr Tag/ImageType                    VR/CS im-type))
+ :InstanceCreationDate         (fn [^Attributes attr #^"[Ljava.util.Date;" date] (.setDate   attr Tag/InstanceCreationDate         VR/DA date))
+ :InstanceCreationTime         (fn [^Attributes attr #^"[Ljava.util.Date;" date] (.setDate   attr Tag/InstanceCreationTime         VR/TM date))
+ :StudyDate                    (fn [^Attributes attr #^"[Ljava.util.Date;" date] (.setDate   attr Tag/StudyDate                    VR/DA date))
+ :SeriesDate                   (fn [^Attributes attr #^"[Ljava.util.Date;" date] (.setDate   attr Tag/SeriesDate                   VR/DA date))
+ :AcquisitionDate              (fn [^Attributes attr #^"[Ljava.util.Date;" date] (.setDate   attr Tag/AcquisitionDate              VR/DA date))
+ :ContentDate                  (fn [^Attributes attr #^"[Ljava.util.Date;" date] (.setDate   attr Tag/ContentDate                  VR/DA date))
+ :StudyTime                    (fn [^Attributes attr #^"[Ljava.util.Date;" date] (.setDate   attr Tag/StudyTime                    VR/TM date))
+ :SeriesTime                   (fn [^Attributes attr #^"[Ljava.util.Date;" date] (.setDate   attr Tag/SeriesTime                   VR/TM date))
+ :AcquisitionTime              (fn [^Attributes attr #^"[Ljava.util.Date;" date] (.setDate   attr Tag/AcquisitionTime              VR/TM date))
+ :ContentTime                  (fn [^Attributes attr #^"[Ljava.util.Date;" date] (.setDate   attr Tag/ContentTime                  VR/TM date))
+ :Manufacturer                 (fn [^Attributes attr ^String manufacturer]       (.setString attr Tag/Manufacturer                 VR/LO manufacturer))
+ :InstitutionName              (fn [^Attributes attr ^String institution]        (.setString attr Tag/InstitutionName              VR/LO institution))
+ :ReferringPhysicianName       (fn [^Attributes attr ^String physician]          (.setString attr Tag/ReferringPhysicianName       VR/PN physician))
+ :StationName                  (fn [^Attributes attr ^String station]            (.setString attr Tag/StationName                  VR/SH station))
+ :StudyDescription             (fn [^Attributes attr ^String study-desc]         (.setString attr Tag/StudyDescription             VR/LO study-desc))
+ :SeriesDescription            (fn [^Attributes attr ^String series-desc]        (.setString attr Tag/SeriesDescription            VR/LO series-desc))
+ :NameOfPhysiciansReadingStudy (fn [^Attributes attr ^String reading-study]      (.setString attr Tag/NameOfPhysiciansReadingStudy VR/PN reading-study))
+ :OperatorsName                (fn [^Attributes attr ^String operator]           (.setString attr Tag/OperatorsName                VR/PN operator))
+ :ManufacturerModelName        (fn [^Attributes attr ^String model-name]         (.setSTring attr Tag/ManufacturerModelName        VR/LO model-name))
+ ;; 0010
+ :PatientName                  (fn [^Attributes attr ^String pname]              (.setString attr Tag/PatientName                  VR/PN pname))
+ :PatientID                    (fn [^Attributes attr ^String ID]                 (.setString attr Tag/PatientID                    VR/PN ID))
+ :PatientBirthDate             (fn [^Attributes attr #^"[Ljava.util.Date;" bday] (.setDate   attr Tag/PatientBirthDate             VR/DA bday))
+ :PatientSex                   (fn [^Attributes attr ^String sex]                (.setString attr Tag/PatientSex                   VR/CS sex))
+ :PatientAge                   (fn [^Attributes attr ^String age]                (.setString attr Tag/PatientAge                   VR/AS age))
+ :AdditionalPatientHistory     (fn [^Attributes attr ^String history]            (.setString attr Tag/AdditionalPatientHistory     VR/LT history))
+ ;; 0018
+ :ScanOptions                  (fn [^Attributes attr ^String options]            (.setString attr Tag/ScanOptions                  VR/CS options))
+ :SliceThickness               (fn [^Attributes attr ^Double thickness]          (.setDouble attr Tag/SliceThickness               VR/DS (double-array [thickness])))
+ :KVP                          (fn [^Attributes attr ^Double kvp]                (.setDouble attr Tag/KVP                          VR/DS (double-array [kvp])))
+ :DataCollectionDiameter       (fn [^Attributes attr ^Double diameter]           (.setDouble attr Tag/DataCollectionDiameter       VR/DS diameter))
+ :SoftwareVersions             (fn [^Attributes attr ^String version]            (.setString attr Tag/SoftwareVersions             VR/LO version))
+ :ProtocolName                 (fn [^Attributes attr ^String protocol]           (.setString attr Tag/ProtocolName                 VR/LO protocol))
+ :ReconstructionDiameter       (fn [^Attributes attr ^Double diameter]           (.setDouble attr Tag/ReconstructionDiameter       VR/DS (double-array [diameter])))
+ :DistanceSourceToDetector     (fn [^Attributes attr ^Double distance]           (.setDouble attr Tag/DistanceSourceToDetector     VR/DS (double-array [distance])))
+ :DistanceSourceToPatient      (fn [^Attributes attr ^Double distance]           (.setDouble attr Tag/DistanceSourceToPatient      VR/DS (double-array [distance])))
+ :GantryDetectorTilt           (fn [^Attributes attr ^Double tilt]               (.setDouble attr Tag/GantryDetectorTilt           VR/DS (double-array [tilt])))
+ :TableHeight                  (fn [^Attributes attr ^Double height]             (.setDouble attr Tag/TableHeight                  VR/DS (double-array [height])))
+ :RotationDirection            (fn [^Attributes attr ^String direction]          (.setString attr Tag/RotationDirection            VR/CS direction))
+ :ExposureTime                 (fn [^Attributes attr ^String exposure-time]      (.setString attr Tag/ExposureTime                 VR/IS exposure-time))
+ :XRayTubeCurrent              (fn [^Attributes attr ^String current]            (.setString attr Tag/XRayTubeCurrent              VR/IS current))
+ :Exposure                     (fn [^Attributes attr ^String exposure]           (.setString attr Tag/Exposure                     VR/IS exposure))
+ :FilterType                   (fn [^Attributes attr ^String filter-type]        (.setString attr Tag/FilterType                   VR/SH filter-type))
+ :GeneratorPower               (fn [^Attributes attr ^String generator-power]    (.setString attr Tag/GeneratorPower               VR/IS generator-power))
+ :FocalSpots                   (fn [^Attributes attr ^Double focalspots]         (.setDouble attr Tag/FocalSpots                   VR/DS (double-array [focalspots])))
+ :ConvolutionKernel            (fn [^Attributes attr ^String kernel]             (.setString attr Tag/ConvolutionKernel            VR/SH kernel))
+ :PatientPosition              (fn [^Attributes attr ^String position]           (.setString attr Tag/PatientPosition              VR/CS position))
+ :RevolutionTime               (fn [^Attributes attr ^Double revo-time]          (.setDouble attr Tag/RevolutionTime               VR/FD (double-array [revo-time])))
+ :SingleCollimationWidth       (fn [^Attributes attr ^Double width]              (.setDouble attr Tag/SingleCollimationWidth       VR/FD (double-array [width])))
+ :TotalCollimationWidth        (fn [^Attributes attr ^Double width]              (.setDouble attr Tag/TotalCollimationWidth        VR/FD (double-array [width])))
+ :TableSpeed                   (fn [^Attributes attr ^Double speed]              (.setDouble attr Tag/TableSpeed                   VR/FD (double-array [speed])))
+ :TableFeedPerRotation         (fn [^Attributes attr ^Double feed]               (.setDouble attr Tag/TableFeedPerRotation         VR/FD (double-array [feed])))
+ :SpiralPitchFactor            (fn [^Attributes attr ^Double pitch]              (.setDouble attr Tag/SpiralPitchFactor            VR/FD (double-array [pitch])))
+ ;; 0020
+ :StudyInstanceUID             (fn [^Attributes attr ^String uid]                (.setString attr Tag/StudyInstanceUID             VR/UI uid))
+ :SeriesInstanceUID            (fn [^Attributes attr ^String uid]                (.setString attr Tag/SeriesInstanceUID            VR/UI uid))
+ :StudyID                      (fn [^Attributes attr ^String study-id]           (.setString attr Tag/StudyID                      VR/SH study-id))
+ :SeriesNumber                 (fn [^Attributes attr ^String snumber]            (.setString attr Tag/SeriesNumber                 VR/IS snumber))
+ :AcquisitionNumber            (fn [^Attributes attr ^String anumber]            (.setString attr Tag/AcquisitionNumber            VR/IS anumber))
+ :InstanceNumber               (fn [^Attributes attr ^String inumber]            (.setString attr Tag/InstanceNumber               VR/IS inumber))
+ :ImagePositionPatient         (fn [^Attributes attr ^doubles image-position]    (.setDouble attr Tag/ImagePositionPatient         VR/DS image-position))
+ :ImageOrientationPatient      (fn [^Attributes attr ^doubles image-orientation] (.setDouble attr Tag/ImageOrientationPatient      VR/DS image-orientation))
+ :FrameOfReferenceUID          (fn [^Attributes attr ^String referenceUID]       (.setString attr Tag/FrameOfReferenceUID          VR/UI (UIDUtils/createUID)))
+ :PositionReferenceIndicator   (fn [^Attributes attr ^String pos-ref]            (.setString attr Tag/PositionReferenceIndicator   VR/LO pos-ref))
+ :SliceLocation                (fn [^Attributes attr ^Double slice-location]     (.setDouble attr Tag/SliceLocation                VR/DS (double-array [slice-location])))
+ ;; 0028
+ :PixelSpacing                 (fn [^Attributes attr ^doubles spacing]           (.setDouble attr Tag/PixelSpacing                 VR/DS spacing))
+ :Rows                         (fn [^Attributes attr ^Integer row]               (.setInt    attr Tag/Rows                         VR/US (int-array    [row])))
+ :Columns                      (fn [^Attributes attr ^Integer col]               (.setInt    attr Tag/Columns                      VR/US (int-array    [col])))
+ :BitsAllocated                (fn [^Attributes attr ^Integer ballocated]        (.setInt    attr Tag/BitsAllocated                VR/US (int-array    [ballocated])))
+ :BitsStored                   (fn [^Attributes attr ^Integer bstored]           (.setInt    attr Tag/BitsStored                   VR/US (int-array    [bstored])))
+ :HighBit                      (fn [^Attributes attr ^Integer highbit]           (.setInt    attr Tag/HighBit                      VR/US (int-array    [15])))
+ :PixelRepresentation          (fn [^Attributes attr ^Integer pixel-rep]         (.setInt    attr Tag/PixelRepresentation          VR/US (int-array    [pixel-rep])))
+ :SamplesPerPixel              (fn [^Attributes attr ^Integer samples-pixel]     (.setInt    attr Tag/SamplesPerPixel              VR/US (int-array    [samples-pixel])))
+ :PixelData                    (fn [^Attributes attr ^integers pixeldata]        (.setInt    attr Tag/PixelData                    VR/OW pixeldata))
+ }
+
+(defn new-dicom
+  "Create new DICOM image from list of given attributes."
+  [tags]
+  (let [attr (Attributes.)]
+    (if (:PixelData tags) (.setInt attr Tag/PixelData VR/OW (into-array Integer/TYPE (to-double-array (:PixelData tags)))))))
