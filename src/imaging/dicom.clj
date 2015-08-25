@@ -49,6 +49,30 @@
 
 (def test_samples "resources/PCT/CTP404_merged")
 
+(defn )
+
+(defn meta-read [filename]
+  (with-open [rdr (io/reader filename)]
+    (let [stream (line-seq rdr)]
+      ;; (pprint (class stream))
+      ;; (pprint (count stream))
+      (filterv some? (mapv (fn [s]
+                             (let [line (str/trim s)]
+                               (when (and (not= (char 35) (first line))
+                                          (not (empty? line)))
+                                 ;; (println line)
+                                 (str/trim (first (str/split line #"#"))))))
+                           stream)))))
+
+(defn meta-parse [content]
+  (filterv some?
+           (mapv (fn [entry]
+                   (let [e (mapv str/trim (str/split entry #"="))]
+                    (if (= (count e) 2)
+                      [(keyword (first e)) (second e)]
+                      (println "Incorrect format : " (first e)))))
+                 content)))
+
 (defn dicomread [filename]
   (let [img (IJ/openImage filename)
         row (.getHeight img)
@@ -287,6 +311,25 @@
 
 ;; (DataInputStream. (FileInputStream. "resources/PCT/x_0.txt"))
 
+(defn str-to-date-array
+  "Convert date string into java.util.Date object array"
+  [^String date-str]
+  (into-array Date [(.parse (SimpleDateFormat. "yyyy-MM-dd") date-str)]))
+
+(defmacro str-to-date
+  [date-str]
+  `(.parse (SimpleDateFormat. "yyyy-MM-dd") ~date-str))
+
+(defn str-to-time-array
+  "Convert date string into java.util.Date object array"
+  [^String time-str]
+  (into-array Date [(.parse (SimpleDateFormat. "HH:mm:ss") time-str)]))
+
+(defmacro str-to-time
+  "Convert date string into java.util.Date object"
+  [time-str]
+  `(.parse (SimpleDateFormat. "HH:mm:ss") ~time-str))
+
 {;; 0008
  :SpecificCharacterSet         (fn [^Attributes attr ^String ch-set]             (.setString attr Tag/SpecificCharacterSet         VR/CS ch-set))
  :ImageType                    (fn [^Attributes attr ^String im-type]            (.setString attr Tag/ImageType                    VR/CS im-type))
@@ -318,31 +361,31 @@
  :AdditionalPatientHistory     (fn [^Attributes attr ^String history]            (.setString attr Tag/AdditionalPatientHistory     VR/LT history))
  ;; 0018
  :ScanOptions                  (fn [^Attributes attr ^String options]            (.setString attr Tag/ScanOptions                  VR/CS options))
- :SliceThickness               (fn [^Attributes attr ^Double thickness]          (.setDouble attr Tag/SliceThickness               VR/DS (double-array [thickness])))
- :KVP                          (fn [^Attributes attr ^Double kvp]                (.setDouble attr Tag/KVP                          VR/DS (double-array [kvp])))
- :DataCollectionDiameter       (fn [^Attributes attr ^Double diameter]           (.setDouble attr Tag/DataCollectionDiameter       VR/DS diameter))
+ :SliceThickness               (fn [^Attributes attr ^String thickness]          (.setDouble attr Tag/SliceThickness               VR/DS (double-array [(Double. thickness)])))
+ :KVP                          (fn [^Attributes attr ^String kvp]                (.setDouble attr Tag/KVP                          VR/DS (double-array [(Double. kvp)])))
+ :DataCollectionDiameter       (fn [^Attributes attr ^String diameter]           (.setDouble attr Tag/DataCollectionDiameter       VR/DS (Double. diameter)))
  :SoftwareVersions             (fn [^Attributes attr ^String version]            (.setString attr Tag/SoftwareVersions             VR/LO version))
  :ProtocolName                 (fn [^Attributes attr ^String protocol]           (.setString attr Tag/ProtocolName                 VR/LO protocol))
- :ReconstructionDiameter       (fn [^Attributes attr ^Double diameter]           (.setDouble attr Tag/ReconstructionDiameter       VR/DS (double-array [diameter])))
- :DistanceSourceToDetector     (fn [^Attributes attr ^Double distance]           (.setDouble attr Tag/DistanceSourceToDetector     VR/DS (double-array [distance])))
- :DistanceSourceToPatient      (fn [^Attributes attr ^Double distance]           (.setDouble attr Tag/DistanceSourceToPatient      VR/DS (double-array [distance])))
- :GantryDetectorTilt           (fn [^Attributes attr ^Double tilt]               (.setDouble attr Tag/GantryDetectorTilt           VR/DS (double-array [tilt])))
- :TableHeight                  (fn [^Attributes attr ^Double height]             (.setDouble attr Tag/TableHeight                  VR/DS (double-array [height])))
+ :ReconstructionDiameter       (fn [^Attributes attr ^String diameter]           (.setDouble attr Tag/ReconstructionDiameter       VR/DS (double-array [(Double. diameter)])))
+ :DistanceSourceToDetector     (fn [^Attributes attr ^String distance]           (.setDouble attr Tag/DistanceSourceToDetector     VR/DS (double-array [(Double. distance)])))
+ :DistanceSourceToPatient      (fn [^Attributes attr ^String distance]           (.setDouble attr Tag/DistanceSourceToPatient      VR/DS (double-array [(Double. distance)])))
+ :GantryDetectorTilt           (fn [^Attributes attr ^String tilt]               (.setDouble attr Tag/GantryDetectorTilt           VR/DS (double-array [(Double. tilt)])))
+ :TableHeight                  (fn [^Attributes attr ^String height]             (.setDouble attr Tag/TableHeight                  VR/DS (double-array [(Double. height)])))
  :RotationDirection            (fn [^Attributes attr ^String direction]          (.setString attr Tag/RotationDirection            VR/CS direction))
  :ExposureTime                 (fn [^Attributes attr ^String exposure-time]      (.setString attr Tag/ExposureTime                 VR/IS exposure-time))
  :XRayTubeCurrent              (fn [^Attributes attr ^String current]            (.setString attr Tag/XRayTubeCurrent              VR/IS current))
  :Exposure                     (fn [^Attributes attr ^String exposure]           (.setString attr Tag/Exposure                     VR/IS exposure))
  :FilterType                   (fn [^Attributes attr ^String filter-type]        (.setString attr Tag/FilterType                   VR/SH filter-type))
  :GeneratorPower               (fn [^Attributes attr ^String generator-power]    (.setString attr Tag/GeneratorPower               VR/IS generator-power))
- :FocalSpots                   (fn [^Attributes attr ^Double focalspots]         (.setDouble attr Tag/FocalSpots                   VR/DS (double-array [focalspots])))
+ :FocalSpots                   (fn [^Attributes attr ^String focalspots]         (.setDouble attr Tag/FocalSpots                   VR/DS (double-array [(Double. focalspots)])))
  :ConvolutionKernel            (fn [^Attributes attr ^String kernel]             (.setString attr Tag/ConvolutionKernel            VR/SH kernel))
  :PatientPosition              (fn [^Attributes attr ^String position]           (.setString attr Tag/PatientPosition              VR/CS position))
- :RevolutionTime               (fn [^Attributes attr ^Double revo-time]          (.setDouble attr Tag/RevolutionTime               VR/FD (double-array [revo-time])))
- :SingleCollimationWidth       (fn [^Attributes attr ^Double width]              (.setDouble attr Tag/SingleCollimationWidth       VR/FD (double-array [width])))
- :TotalCollimationWidth        (fn [^Attributes attr ^Double width]              (.setDouble attr Tag/TotalCollimationWidth        VR/FD (double-array [width])))
- :TableSpeed                   (fn [^Attributes attr ^Double speed]              (.setDouble attr Tag/TableSpeed                   VR/FD (double-array [speed])))
- :TableFeedPerRotation         (fn [^Attributes attr ^Double feed]               (.setDouble attr Tag/TableFeedPerRotation         VR/FD (double-array [feed])))
- :SpiralPitchFactor            (fn [^Attributes attr ^Double pitch]              (.setDouble attr Tag/SpiralPitchFactor            VR/FD (double-array [pitch])))
+ :RevolutionTime               (fn [^Attributes attr ^String revo-time]          (.setDouble attr Tag/RevolutionTime               VR/FD (double-array [(Double. revo-time)])))
+ :SingleCollimationWidth       (fn [^Attributes attr ^String width]              (.setDouble attr Tag/SingleCollimationWidth       VR/FD (double-array [(Double. width)])))
+ :TotalCollimationWidth        (fn [^Attributes attr ^String width]              (.setDouble attr Tag/TotalCollimationWidth        VR/FD (double-array [(Double. width)])))
+ :TableSpeed                   (fn [^Attributes attr ^String speed]              (.setDouble attr Tag/TableSpeed                   VR/FD (double-array [(Double. speed)])))
+ :TableFeedPerRotation         (fn [^Attributes attr ^String feed]               (.setDouble attr Tag/TableFeedPerRotation         VR/FD (double-array [(Double. feed)])))
+ :SpiralPitchFactor            (fn [^Attributes attr ^String pitch]              (.setDouble attr Tag/SpiralPitchFactor            VR/FD (double-array [(Double. pitch)])))
  ;; 0020
  :StudyInstanceUID             (fn [^Attributes attr ^String uid]                (.setString attr Tag/StudyInstanceUID             VR/UI uid))
  :SeriesInstanceUID            (fn [^Attributes attr ^String uid]                (.setString attr Tag/SeriesInstanceUID            VR/UI uid))
@@ -354,16 +397,16 @@
  :ImageOrientationPatient      (fn [^Attributes attr ^doubles image-orientation] (.setDouble attr Tag/ImageOrientationPatient      VR/DS image-orientation))
  :FrameOfReferenceUID          (fn [^Attributes attr ^String referenceUID]       (.setString attr Tag/FrameOfReferenceUID          VR/UI (UIDUtils/createUID)))
  :PositionReferenceIndicator   (fn [^Attributes attr ^String pos-ref]            (.setString attr Tag/PositionReferenceIndicator   VR/LO pos-ref))
- :SliceLocation                (fn [^Attributes attr ^Double slice-location]     (.setDouble attr Tag/SliceLocation                VR/DS (double-array [slice-location])))
+ :SliceLocation                (fn [^Attributes attr ^String slice-location]     (.setDouble attr Tag/SliceLocation                VR/DS (double-array [(Double. slice-location)])))
  ;; 0028
  :PixelSpacing                 (fn [^Attributes attr ^doubles spacing]           (.setDouble attr Tag/PixelSpacing                 VR/DS spacing))
- :Rows                         (fn [^Attributes attr ^Integer row]               (.setInt    attr Tag/Rows                         VR/US (int-array    [row])))
- :Columns                      (fn [^Attributes attr ^Integer col]               (.setInt    attr Tag/Columns                      VR/US (int-array    [col])))
- :BitsAllocated                (fn [^Attributes attr ^Integer ballocated]        (.setInt    attr Tag/BitsAllocated                VR/US (int-array    [ballocated])))
- :BitsStored                   (fn [^Attributes attr ^Integer bstored]           (.setInt    attr Tag/BitsStored                   VR/US (int-array    [bstored])))
- :HighBit                      (fn [^Attributes attr ^Integer highbit]           (.setInt    attr Tag/HighBit                      VR/US (int-array    [15])))
- :PixelRepresentation          (fn [^Attributes attr ^Integer pixel-rep]         (.setInt    attr Tag/PixelRepresentation          VR/US (int-array    [pixel-rep])))
- :SamplesPerPixel              (fn [^Attributes attr ^Integer samples-pixel]     (.setInt    attr Tag/SamplesPerPixel              VR/US (int-array    [samples-pixel])))
+ :Rows                         (fn [^Attributes attr ^String row]                (.setInt    attr Tag/Rows                         VR/US (int-array    [(Integer. row)])))
+ :Columns                      (fn [^Attributes attr ^String col]                (.setInt    attr Tag/Columns                      VR/US (int-array    [(Integer. col)])))
+ :BitsAllocated                (fn [^Attributes attr ^String ballocated]         (.setInt    attr Tag/BitsAllocated                VR/US (int-array    [(Integer. ballocated)])))
+ :BitsStored                   (fn [^Attributes attr ^String bstored]            (.setInt    attr Tag/BitsStored                   VR/US (int-array    [(Integer. bstored)])))
+ :HighBit                      (fn [^Attributes attr ^String highbit]            (.setInt    attr Tag/HighBit                      VR/US (int-array    [(Integer. 15)])))
+ :PixelRepresentation          (fn [^Attributes attr ^String pixel-rep]          (.setInt    attr Tag/PixelRepresentation          VR/US (int-array    [(Integer. pixel-rep)])))
+ :SamplesPerPixel              (fn [^Attributes attr ^String samples-pixel]      (.setInt    attr Tag/SamplesPerPixel              VR/US (int-array    [(Integer. samples-pixel)])))
  :PixelData                    (fn [^Attributes attr ^integers pixeldata]        (.setInt    attr Tag/PixelData                    VR/OW pixeldata))
  }
 
@@ -372,3 +415,4 @@
   [tags]
   (let [attr (Attributes.)]
     (if (:PixelData tags) (.setInt attr Tag/PixelData VR/OW (into-array Integer/TYPE (to-double-array (:PixelData tags)))))))
+
