@@ -49,28 +49,6 @@
 
 (def test_samples "resources/PCT/CTP404_merged")
 
-(defn meta-read [filename]
-  (with-open [rdr (io/reader filename)]
-    (let [stream (line-seq rdr)]
-      ;; (pprint (class stream))
-      ;; (pprint (count stream))
-      (filterv some? (mapv (fn [s]
-                             (let [line (str/trim s)]
-                               (when (and (not= (char 35) (first line))
-                                          (not (empty? line)))
-                                 ;; (println line)
-                                 (str/trim (first (str/split line #"#"))))))
-                           stream)))))
-
-(defn meta-parse [content]
-  (filterv some?
-           (mapv (fn [entry]
-                   (let [e (mapv str/trim (str/split entry #"="))]
-                    (if (= (count e) 2)
-                      [(keyword (first e)) (second e)]
-                      (println "Incorrect format : " (first e)))))
-                 content)))
-
 (defn dicomread [filename]
   (let [img (IJ/openImage filename)
         row (.getHeight img)
@@ -424,3 +402,49 @@
   (let [attr (Attributes.)]
     (if (:PixelData tags) (.setInt attr Tag/PixelData VR/OW (into-array Integer/TYPE (to-double-array (:PixelData tags)))))))
 
+
+(defn read-tags
+  "Read tags from a file, and return a map"
+  ^clojure.lang.PersistentArrayMap
+  [filename]
+  {})
+
+
+(defn meta-read [filename]
+  (with-open [rdr (io/reader filename)]
+    (let [stream (line-seq rdr)]
+      ;; (pprint (class stream))
+      ;; (pprint (count stream))
+      (filterv some? (mapv (fn [s]
+                             (let [line (str/trim s)]
+                               (when (and (not= (char 35) (first line))
+                                          (not (empty? line)))
+                                 ;; (println line)
+                                 (str/trim (first (str/split line #"#"))))))
+                           stream)))))
+
+(defn meta-parse [content]
+  (into {}  (filterv some?
+                    (mapv (fn [entry]
+                            (let [e (mapv str/trim (str/split entry #"="))]
+                              (if (= (count e) 2)
+                                [(keyword (first e)) (second e)]
+                                (println "Incorrect format : " (first e)))))
+                          content))))
+
+(defn new-attribute
+  "Create a new attribute object based on the attribute map using update-table"
+  [attr-map]
+  (let [attr (Attributes.)]
+    (dorun
+     (map (fn [[k v]]
+            ;; (pprint [k v])
+            (if (k update-table)
+              ((k update-table) attr v)))
+          attr-map))
+    attr))
+
+(defn read-test
+  "Test reading dicom tags"
+  []
+  (meta-parse (meta-read "resources/PCT/CTP404_merged/meta_info.txt" )))
